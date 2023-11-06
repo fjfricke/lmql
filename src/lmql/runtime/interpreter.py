@@ -102,6 +102,8 @@ class PromptState(NamedTuple):
     where: Optional[Any]
     tail: Optional[str]
 
+    distribution_logprobs: Optional[Dict[str, float]] = {}
+
     def __str__(self):
         return f"<PromptState '{self.variable}' '{[self.prompt]}'>"
 
@@ -543,15 +545,20 @@ class PromptInterpreter:
             # update hint for max_tokens to generate for current var
             max_tokens_hint = ops.most_restrictive_hint([sub_max_token_hints, max_tokens_hint])
 
+            if len(s.distribution_logprobs) > variable_offset:
+                scores = s.distribution_logprobs[variable_offset]
+            else:
+                scores = None
+
             # current context
             program_state: ProgramState = state.program_state.copy()
-            program_state.set(variable, text, scores=(), diff=diff_text, montonicity="inc", tokens=text_tokens)
+            program_state.set(variable, text, scores=scores, diff=diff_text, montonicity="inc", tokens=text_tokens)
             program_state.subinterpreter_results = subvalid
             program_state.prompt = state.prompt
 
             # follow context
             follow_program_state: ProgramState = state.program_state.copy()
-            follow_program_state.set(variable, text + str(ops.NextToken), scores=(), diff=diff_text, montonicity="inc", tokens=text_tokens)
+            follow_program_state.set(variable, text + str(ops.NextToken), scores=scores, diff=diff_text, montonicity="inc", tokens=text_tokens)
             follow_program_state.subinterpreter_results = subfollow
             follow_program_state.prompt = state.prompt
 
@@ -611,6 +618,7 @@ class PromptInterpreter:
                         program_state=program_state,
                         stopping_phrases=stopping_phrases,
                         where=await self.where_graph_with_trace(where, trace, follow_trace),
+                        distribution_logprobs=scores,
         )
 
         # extract hint of maximum number of tokens to generate for 'variable' from 
@@ -758,7 +766,7 @@ class PromptInterpreter:
             
             variable_value = text
             # set raw variable value
-            program_state.set(variable, variable_value, scores=(), diff=text_diff, montonicity="fin", tokens=text_tokens)
+            program_state.set(variable, variable_value, scores=state.distribution_logprobs, diff=text_diff, montonicity="fin", tokens=text_tokens)
 
             where = state.full_where_condition(self)
 
@@ -1019,6 +1027,9 @@ class PromptInterpreter:
                 if _DCLibDebugPrinter.printer.records_graph:
                     dc.set_record_graph()
                     self.decoder_graph = dc.DecoderSequence.graph
+        if self.model.adapter.decoder_args.get("decoder_graph", False):
+            dc.set_record_graph()
+            self.decoder_graph = dc.DecoderSequence.graph
 
         # get decoder function
         mode = decoder_args["decoder"].lower()

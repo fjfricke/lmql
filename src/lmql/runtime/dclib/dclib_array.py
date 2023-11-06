@@ -12,6 +12,7 @@ class Continuation:
     token: Any
     logprob: Any
     user_data: Any
+    distribution_logprobs: Any = None
 class criterion: 
     def __and__(self, other):
         return logical_and(self, other)
@@ -325,8 +326,9 @@ class DataArray:
                 tokens = continuation.token.reshape(-1)
                 logprobs = continuation.logprob.reshape(-1)
                 user_data = continuation.user_data or [None] * len(tokens)
-                for t,s,u in zip(tokens, logprobs, user_data):
-                    extended_seqs.append(sq.extend(Continuation(t, s, u)))
+                distribution_logprobs = continuation.distribution_logprobs or [None] * len(tokens)
+                for t,s,u,d in zip(tokens, logprobs, user_data, distribution_logprobs):
+                    extended_seqs.append(sq.extend(Continuation(t, s, u, d)))
             return extended_seqs
 
         return DataArray(apply_componentwise(op_extend, self.sequences, other.sequences, "extend", allow_mismatch_keys=False), dims=self.shape)

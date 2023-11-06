@@ -82,7 +82,7 @@ class DecoderGraph:
         }
 
 class DecoderSequence:
-    def __init__(self, input_ids_or_str, logprobs=None, deterministic=None, stop_phrase=None, predecessor=None, user_data=None, sticky_user_data_keys=None, epsilon_node=False, internal=False):
+    def __init__(self, input_ids_or_str, logprobs=None, deterministic=None, stop_phrase=None, predecessor=None, user_data=None, sticky_user_data_keys=None, epsilon_node=False, internal=False, distribution_logprobs=None):
         if logprobs is not None:
             if not all([p > get_truncation_threshold() for p in logprobs]):
                 warnings.warn("logprobs contain values below the current logprob truncation threshold {t}, which may cause unexpected behavior. Consider increasing the truncation threshold via lmql.model(..., truncation_threshold=...).".format(t=get_truncation_threshold()))
@@ -141,6 +141,10 @@ class DecoderSequence:
 
         # indicates to dc.rewrite whether this sequence can be rewritten
         self.needs_rewrite = True
+        if not distribution_logprobs:
+            self.distribution_logprobs = [None] * len(self.logprobs)
+        else:
+            self.distribution_logprobs = distribution_logprobs
 
     def __hash__(self) -> int:
         return hash(self.id)
@@ -371,7 +375,8 @@ class DecoderSequence:
             predecessor=self,
             user_data=self.extend_user_data(continuation),
             sticky_user_data_keys=self.sticky_user_data_keys,
-            internal=internal
+            internal=internal,
+            distribution_logprobs=self.distribution_logprobs + [continuation.distribution_logprobs]
         )
 
     def detect_stop_phrase(self, continuation):
@@ -436,6 +441,10 @@ class DecoderSequence:
         tokens = [t for t, s in zip(next_tokens, next_token_scores) if s > get_truncation_threshold()]
         scores = [s for s in next_token_scores if s > get_truncation_threshold()]
 
+        distribution_logprobs = [{k: v for k, v in logits.probs.items() if type(k) == str}]
+        if len(distribution_logprobs[0]) < 1:
+            distribution_logprobs = None
+
         if len(tokens) == 0:
             print("WARNING: all continuation token fall below the current logprob truncation threshold {t}. This is likely due to a too low truncation threshold. Please increase the truncation threshold via lmql.model(..., truncation_threshold=...).".format(t=get_truncation_threshold()))
             tokens = [t for t, s in zip(next_tokens, next_token_scores)][:1]
@@ -443,7 +452,7 @@ class DecoderSequence:
         next_tokens = np.stack(tokens, axis=0)
         next_token_scores = np.stack(scores, axis=0)
 
-        return Continuation(next_tokens, next_token_scores, user_data)
+        return Continuation(next_tokens, next_token_scores, user_data, distribution_logprobs)
 # global counter for all sequences created in this process for identification purposes
 DecoderSequence.seq_ctr = 0
 DecoderSequence.graph = None
