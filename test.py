@@ -26,15 +26,16 @@ async def main():
         import math
         def get_probs(variable_value, prompt_value, context):
             breakpoint()
-            logprob_scores = list(context.variable_scores.items())[0][1]
+            logprob_scores = list(context.variable_scores.items())[-1][1]
             scores = dict()
             for key, value in logprob_scores.items():
                 if value > -5:
                     scores[key] = math.exp(value)
             return scores
         argmax(verbose=True)
-        \"How much you like monkeys between 0 and 2?[@get_probs WORLD]\" where WORLD in set ([\"0\", \"1\", \"2\"])
-        return WORLD
+        \"How much you like monkeys between 0 and 2?[@get_probs MONKEY]\" where MONKEY in set ([\"0\", \"1\", \"2\"])
+        \"How much you like birds between 0 and 2?[@get_probs BIRD]\" where BIRD in set ([\"0\", \"1\", \"2\"])
+        return (MONKEY, BIRD)
         """,
         max_len=4000,
         model=test,
