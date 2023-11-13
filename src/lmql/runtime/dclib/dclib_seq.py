@@ -441,7 +441,7 @@ class DecoderSequence:
         tokens = [t for t, s in zip(next_tokens, next_token_scores) if s > get_truncation_threshold()]
         scores = [s for s in next_token_scores if s > get_truncation_threshold()]
 
-        distribution_logprobs = [{get_tokenizer().decode([k]): v for k, v in logits.probs.items() if type(k) == int and v > -10}]
+        distribution_logprobs = [{get_tokenizer().decode([k]) if isinstance(k, int) else k: v for k, v in logits.probs.items() if v > -10}]
         if len(distribution_logprobs[0]) < 1:
             distribution_logprobs = None
 
