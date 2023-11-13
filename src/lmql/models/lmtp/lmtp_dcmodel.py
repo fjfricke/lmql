@@ -224,7 +224,7 @@ class LMTPDcModel(DcModel):
     async def singleton_result(self, token, score):
         yield {"token": token, "logprob": score, "top_logprobs": {token: score}}
 
-    async def generate(self, s, temperature, top_logprobs = 1, chunk_size=None, **kwargs):
+    async def generate(self, s, temperature, top_logprobs = 5, chunk_size=None, **kwargs):
         kwargs = {**self.model_args, **kwargs}
 
         # get token masks from interpreter
